@@ -1,6 +1,7 @@
 package buffer
 
 import (
+	"log"
 	"sync"
 	"time"
 )
@@ -9,16 +10,17 @@ type CircularBuffer struct {
 	buffer       []int
 	size         int
 	mutex        sync.Mutex
-	flushChan    chan []int
+	FlushChan    chan []int // Измените на с заглавной буквы
 	flushTimeout time.Duration
 }
 
 // NewCircularBuffer создает новый кольцевой буфер
 func NewCircularBuffer(size int, flushTimeout time.Duration) *CircularBuffer {
+	log.Println("Создан новый кольцевой буфер с размером:", size)
 	return &CircularBuffer{
 		buffer:       make([]int, 0, size),
 		size:         size,
-		flushChan:    make(chan []int),
+		FlushChan:    make(chan []int), // И здесь тоже
 		flushTimeout: flushTimeout,
 	}
 }
@@ -28,9 +30,19 @@ func (cb *CircularBuffer) Add(item int) {
 	cb.mutex.Lock()
 	defer cb.mutex.Unlock()
 
+	log.Printf("Добавление элемента %d в буфер\n", item)
 	cb.buffer = append(cb.buffer, item)
 	if len(cb.buffer) >= cb.size {
 		cb.flush()
+	}
+}
+
+// flush очищает буфер и отправляет данные в канал для обработки
+func (cb *CircularBuffer) flush() {
+	if len(cb.buffer) > 0 {
+		log.Printf("Опустошение буфера. Отправка данных в канал: %v\n", cb.buffer)
+		cb.FlushChan <- cb.buffer // Здесь тоже
+		cb.buffer = make([]int, 0, cb.size)
 	}
 }
 
@@ -43,17 +55,4 @@ func (cb *CircularBuffer) FlushPeriodically() {
 		cb.flush()
 		cb.mutex.Unlock()
 	}
-}
-
-// flush очищает буфер и отправляет данные в канал для обработки
-func (cb *CircularBuffer) flush() {
-	if len(cb.buffer) > 0 {
-		cb.flushChan <- cb.buffer
-		cb.buffer = make([]int, 0, cb.size)
-	}
-}
-
-// FlushChan возвращает канал для отправки данных потребителю
-func (cb *CircularBuffer) FlushChan() <-chan []int {
-	return cb.flushChan
 }

@@ -3,6 +3,7 @@ package pipeline
 import (
 	"bufio"
 	"fmt"
+	"log"
 	"os"
 	"strconv"
 	"time"
@@ -27,6 +28,7 @@ func InputDataSource() <-chan int {
 
 			// Обрабатываем завершение ввода
 			if input == "exit" {
+				log.Println("Завершение ввода данных.")
 				break
 			}
 
@@ -34,11 +36,12 @@ func InputDataSource() <-chan int {
 			num, err := strconv.Atoi(input)
 			if err != nil {
 				// Если ввод не корректен, просим ввести целое число
-				fmt.Println("Некорректный ввод. Пожалуйста, введите целое число.")
+				log.Println("Некорректный ввод. Пожалуйста, введите целое число.")
 				continue
 			}
 
 			// Отправляем число в канал
+			log.Printf("Получено число: %d\n", num)
 			output <- num
 		}
 	}()
@@ -50,7 +53,7 @@ func DataConsumer(input <-chan []int, done chan<- struct{}) {
 	go func() {
 		for data := range input {
 			// Выводим массив данных
-			fmt.Printf("Получены данные: %v\n", data)
+			log.Printf("Получены данные: %v\n", data)
 		}
 		done <- struct{}{}
 	}()
@@ -60,6 +63,7 @@ func DataConsumer(input <-chan []int, done chan<- struct{}) {
 func Pipeline(bufferSize int, flushInterval time.Duration) {
 	// Инициализация буфера
 	circularBuffer := buffer.NewCircularBuffer(bufferSize, flushInterval)
+	log.Printf("Инициализация конвейера с буфером размером %d и интервалом %v\n", bufferSize, flushInterval)
 	go circularBuffer.FlushPeriodically()
 
 	// Источник данных
@@ -71,9 +75,10 @@ func Pipeline(bufferSize int, flushInterval time.Duration) {
 
 	// Добавляем отфильтрованные данные в буфер
 	done := make(chan struct{})
-	DataConsumer(circularBuffer.FlushChan(), done)
+	DataConsumer(circularBuffer.FlushChan, done) // Передаем канал, а не вызываем его как функцию
 
 	for num := range filteredMultiplesOfThree {
+		log.Printf("Добавление числа %d в буфер\n", num)
 		circularBuffer.Add(num)
 	}
 
